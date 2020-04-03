@@ -1,13 +1,18 @@
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-            <title>#(title)</title>
-            </head>
-    <body>
-        <h1>#(acronym.short)</h1>
-        <h2>#(acronym.long)</h2>
-        <p>Created by #(user.name)</p>
-    </body>
-</html>
-
+#set("content") {
+    <h1>#(acronym.short)</h1>
+    <h2>#(acronym.long)</h2>
+    <p>Created by <a href = "/users/#(user.id)"> #(user.name)</a> </p>
+#if(count(categories) > 0) {
+ <h3>Categories</h3>
+    <ul class="navbar-nav">
+        #for(category in categories) {
+        <li class= "nav-item #if(title == "Homepage") {active}">
+            <a class= "nav-link" href= "/categories/#(category.id)">#(category.name)</a>
+        </li>
+        }
+    </ul>
+} else {
+<h2>There aren't any category yet!</h2>
+}
+}
+#embed("base")
