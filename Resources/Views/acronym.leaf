@@ -1,18 +1,23 @@
 #set("content") {
     <h1>#(acronym.short)</h1>
+
     <h2>#(acronym.long)</h2>
+
     <p>Created by <a href = "/users/#(user.id)"> #(user.name)</a> </p>
+
 #if(count(categories) > 0) {
  <h3>Categories</h3>
-    <ul class="navbar-nav">
+    <ul>
         #for(category in categories) {
-        <li class= "nav-item #if(title == "Homepage") {active}">
-            <a class= "nav-link" href= "/categories/#(category.id)">#(category.name)</a>
+        <li>
+            <a href= "/categories/#(category.id)">#(category.name)</a>
         </li>
         }
     </ul>
-} else {
-<h2>There aren't any category yet!</h2>
-}
+    }
+    <form method="post" action="/acronyms/#(acronym.id)/delete">
+        <a class= "btn btn-primary" href="/acronyms/#(acronym.id)/edit/" role="button"> Edit</a>
+        <input class="btn btn-danger" type="submit" value="Delete">
+    </form>
 }
 #embed("base")

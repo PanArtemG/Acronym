@@ -27,6 +27,9 @@
                     <li class= "nav-item #if(title == "All Categories") {active}">
                         <a class= "nav-link" href= "/categories">All Categories</a>
                     </li>
+                    <li class= "nav-item #if(title == "Create An Acronym") {active}">
+                        <a class= "nav-link" href= "/acronyms/create">Create An Acronym</a>
+                    </li>
                 </ul>
             </div>
         </nav>
