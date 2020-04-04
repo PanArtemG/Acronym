@@ -15,14 +15,19 @@ struct AcronymsController: RouteCollection {
     func boot(router: Router) throws {
         let acronymsRoute = router.grouped("api", "acronyms")
         acronymsRoute.get(use: getAllHandler)
-        acronymsRoute.post(Acronym.self, use: createHandler)
         acronymsRoute.get(Acronym.parameter, use: getAllHandler)
-        acronymsRoute.delete(Acronym.parameter, use: deleteHandler)
-        acronymsRoute.put(Acronym.parameter, use: updateHandler)
         acronymsRoute.get(Acronym.parameter, "user", use: getUserHandler)
         acronymsRoute.get(Acronym.parameter, "categories", use: getCategoriesHandler)
-        acronymsRoute.post(Acronym.parameter, "categories", Category.parameter, use: addCategoriesHandler)
+        
         acronymsRoute.get("search", use: searchHandler)
+        
+        let tokenAuthMiddleware = User.tokenAuthMiddleware()
+        let guardMiddleware = User.guardAuthMiddleware()
+        let tokenAuthGroup = acronymsRoute.grouped(tokenAuthMiddleware, guardMiddleware)
+        tokenAuthGroup.post(AcronymCreateData.self, use: createHandler)
+        tokenAuthGroup.delete(Acronym.parameter, use: deleteHandler)
+        tokenAuthGroup.put(Acronym.parameter, use: updateHandler)
+        tokenAuthGroup.post(Acronym.parameter, "categories", Category.parameter, use: addCategoriesHandler)
     }
     
     // Return all Acronyms (Acronym.query(on: req).all())
@@ -30,7 +35,9 @@ struct AcronymsController: RouteCollection {
         return Acronym.query(on: req).all()
     }
     //Create Acronym (acronym.save(on: req))
-    func createHandler(_ req: Request, acronym: Acronym) throws -> Future<Acronym> {
+    func createHandler(_ req: Request, acronymData: AcronymCreateData) throws -> Future<Acronym> {
+        let user = try req.requireAuthenticated(User.self)
+        let acronym = try Acronym(short: acronymData.short, long: acronymData.long, userID: user.requireID())
         return acronym.save(on: req)
     }
     
@@ -45,9 +52,11 @@ struct AcronymsController: RouteCollection {
     }
     
     func updateHandler(_ req: Request) throws -> Future<Acronym> {
-        return try flatMap(to: Acronym.self, req.parameters.next(Acronym.self), req.content.decode(Acronym.self)) { acronym, updateAcronum in
+        return try flatMap(to: Acronym.self, req.parameters.next(Acronym.self), req.content.decode(AcronymCreateData.self)) { acronym, updateAcronum in
             acronym.short = updateAcronum.short
             acronym.long = updateAcronum.long
+            let user = try req.requireAuthenticated(User.self)
+            acronym.userID = try user.requireID()
             return acronym.save(on: req)
         }
     }
@@ -81,4 +90,9 @@ struct AcronymsController: RouteCollection {
             or.filter(\.long == searchTerm)
         }.all()
     }
+}
+
+struct AcronymCreateData: Content {
+    let short: String
+    let long: String
 }
