@@ -52,9 +52,9 @@ struct AcronymsController: RouteCollection {
         }
     }
     
-    func getUserHandler(_ req: Request) throws -> Future<User> {
-        return try req.parameters.next(Acronym.self).flatMap(to: User.self) { acronym in
-            return acronym.user.get(on: req)
+    func getUserHandler(_ req: Request) throws -> Future<User.Public> {
+        return try req.parameters.next(Acronym.self).flatMap(to: User.Public.self) { acronym in
+            return acronym.user.get(on: req).convertToPublic()
         }
     }
     
