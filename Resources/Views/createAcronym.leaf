@@ -19,15 +19,6 @@
                    #if(editing) {value="#(acronym.long)"}>
         </div>
         
-        <div class="form-group">
-            <label for= "selectID"> User </label>
-            <select class= "form-control" id="selectID" name ="userID">
-                #for(user in users) {
-                    <option value="#(user.id)" #if(user.id == acronym.userID) {selected}>#(user.name)</option>
-                }
-            </select>
-        </div>
-
         <button class= "btn btn-primary" type="submit"> #if(editing) {Update} else {Submit}</button>
 
     </form>

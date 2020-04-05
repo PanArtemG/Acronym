@@ -6,21 +6,28 @@
 //
 
 import Vapor
+import Authentication
 
 
 struct WebsiteController: RouteCollection {
     func boot(router: Router) throws {
-        router.get(use: indexHandler)
-        router.get("acronyms", Acronym.parameter, use:acronumHandler)
-        router.get("users", User.parameter, use:userHandler)
-        router.get("users", use: allUsersHandler)
-        router.get("categories", Category.parameter, use:categoryHandler)
-        router.get("categories", use: allCategoriesHandler)
-        router.get("acronyms", "create",use: createAcronymHandler)
-        router.post(Acronym.self, at: "acronyms", "create", use: createAcronumPostHandler)
-        router.get("acronyms", Acronym.parameter, "edit", use: editAcronymHandler)
-        router.post("acronyms", Acronym.parameter, "edit", use: editAcronymPostHandler)
-        router.post("acronyms", Acronym.parameter, "delete", use: deleteAcronymHandler)
+        let authSessionsRoutes = router.grouped(User.authSessionsMiddleware())
+        authSessionsRoutes.get(use: indexHandler)
+        authSessionsRoutes.get("acronyms", Acronym.parameter, use:acronumHandler)
+        authSessionsRoutes.get("users", User.parameter, use:userHandler)
+        authSessionsRoutes.get("users", use: allUsersHandler)
+        authSessionsRoutes.get("categories", Category.parameter, use:categoryHandler)
+        authSessionsRoutes.get("categories", use: allCategoriesHandler)
+        authSessionsRoutes.get("login", use: loginHandler)
+        authSessionsRoutes.post("login", use: loginPostHandler)
+
+
+        let protectedRoutes = authSessionsRoutes.grouped(RedirectMiddleware<User>(path: "/login"))
+        protectedRoutes.get("acronyms", "create",use: createAcronymHandler)
+        protectedRoutes.post(CreateAcronymData.self, at: "acronyms", "create", use: createAcronumPostHandler)
+        protectedRoutes.get("acronyms", Acronym.parameter, "edit", use: editAcronymHandler)
+        protectedRoutes.post("acronyms", Acronym.parameter, "edit", use: editAcronymPostHandler)
+        protectedRoutes.post("acronyms", Acronym.parameter, "delete", use: deleteAcronymHandler)
     }
     
     func indexHandler(_ req: Request) throws -> Future<View> {
@@ -67,11 +74,13 @@ struct WebsiteController: RouteCollection {
     }
     
     func createAcronymHandler(_ req: Request) throws -> Future<View> {
-        let context = CreateAcronymContext(users: User.query(on: req).all())
+        let context = CreateAcronymContext()
         return try req.view().render("createAcronym", context)
     }
     
-    func createAcronumPostHandler(_ req: Request, acronym: Acronym) throws -> Future<Response> {
+    func createAcronumPostHandler(_ req: Request, acronymData: CreateAcronymData) throws -> Future<Response> {
+        let user = try req.requireAuthenticated(User.self)
+        let acronym = try Acronym(short: acronymData.short, long: acronymData.long, userID: user.requireID())
         return acronym.save(on: req).map(to: Response.self) { acronym in
             guard let id = acronym.id else {
                 return req.redirect(to: "/")
@@ -81,18 +90,19 @@ struct WebsiteController: RouteCollection {
     }
     
     func editAcronymHandler(_ req: Request) throws -> Future<View> {
-        return try flatMap(to: View.self, req.parameters.next(Acronym.self), User.query(on: req).all()) { acronym, users in
-            let context = EditAcronymContext(title: "Edit Acronym", acronym: acronym, users: users)
+        return try req.parameters.next(Acronym.self).flatMap(to: View.self) { acronym in
+            let context = EditAcronymContext(title: "Edit Acronym", acronym: acronym)
             return try req.view().render("createAcronym", context)
         }
     }
     
     func editAcronymPostHandler(_ req: Request) throws -> Future<Response> {
         return try req.parameters.next(Acronym.self).flatMap(to: Response.self) { acronym in
-            let updatedAcronum = try req.content.syncDecode(Acronym.self)
+            let updatedAcronum = try req.content.syncDecode(CreateAcronymData.self)
             acronym.short = updatedAcronum.short
             acronym.long = updatedAcronum.long
-            acronym.userID = updatedAcronum.userID
+            let user = try req.requireAuthenticated(User.self)
+            acronym.userID = try user.requireID()
             
             return acronym.save(on: req).map(to: Response.self) { savedAcronym in
                 guard let id = savedAcronym.id else {
@@ -109,12 +119,24 @@ struct WebsiteController: RouteCollection {
         }
     }
     
+    func loginHandler(_ req: Request) throws -> Future<View> {
+        let context = LoginContext()
+        return try req.view().render("login", context)
+    }
+    
+    func loginPostHandler(_ req: Request) throws -> Future<Response> {
+        let loginData = try req.content.syncDecode(LoginPostData.self)
+        return User.authenticate(username: loginData.userName, password: loginData.password, using: BCryptDigest(), on: req).map(to: Response.self) {user in
+            guard let user = user else {
+                return req.redirect(to: "/login")
+            }
+            try req.authenticateSession(user)
+            return req.redirect(to: "/")
+        }
+    }
+    
     
 }
-
-
-
-
 
 
 struct IndexContext: Encodable {
@@ -153,12 +175,24 @@ struct AllCategoriesContext: Encodable {
 
 struct CreateAcronymContext: Encodable {
     let title = "Create An Acronym"
-    let users: Future<[User]>
 }
 
 struct EditAcronymContext: Encodable {
     let title: String
     let acronym: Acronym
-    let users: [User]
     let editing = true
+}
+
+struct CreateAcronymData: Content {
+    let short: String
+    let long: String
+}
+
+struct LoginContext: Encodable {
+    let title = "Log in"
+}
+
+struct LoginPostData: Content {
+    let userName: String
+    let password: String
 }

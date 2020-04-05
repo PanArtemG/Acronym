@@ -41,9 +41,8 @@ extension Token {
 }
 
 extension Token: Authentication.Token {
-    typealias UserType = User
-    
     static let userIDKey: UserIDKey = \Token.userID
+    typealias UserType = User
 }
 
 extension Token:BearerAuthenticatable {

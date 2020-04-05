@@ -75,3 +75,6 @@ extension User: TokenAuthenticatable {
     
     
 }
+
+extension User: PasswordAuthenticatable {}
+extension User: SessionAuthenticatable {}
